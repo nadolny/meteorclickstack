@@ -1,0 +1,46 @@
+# -*-shell-script-*-
+. "$genapp_functions/core"
+
+_version=$(metadata meteor_version "0.6.6.2")
+
+cd $app_dir
+curl --output meteor.tar.gz --fail https://warehouse.meteor.com/bootstrap/${_version}/meteor-bootstrap-Linux_x86_64.tar.gz
+if [ $? != 0 ]
+then
+    echo "unsupported meteor version : $_version"
+    exit -1
+fi
+
+rm -rf .meteor
+tar xf meteor.tar.gz
+
+# Install everything from pkg_dir
+mkdir $app_dir/app
+cp -a $pkg_dir/{*,.??*} $app_dir/app
+
+if [ ! -e  $app_dir/app/.meteor ] 
+then
+    echo "Application is missing .meteor folder"
+    exit -1
+fi
+chmod -R +rw $app_dir/app/.meteor
+
+
+# we want to export all config
+while read line ; do echo "export $line" >> $app_dir/.genapp/control/env_exports ; done < $app_dir/.genapp/control/env
+
+cat > "$control_dir/start" << EOF
+#!/bin/sh
+export METEOR_WAREHOUSE_DIR=$app_dir/.meteor
+export PORT=$app_port
+. $app_dir/.genapp/control/env_exports
+
+cd $app_dir/app
+
+exec $app_dir/.meteor/meteor
+EOF
+
+# start must be executable
+chmod 755 "$control_dir/start"
+
+
